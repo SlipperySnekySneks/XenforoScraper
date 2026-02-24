@@ -23,7 +23,7 @@ The script uses a real browser (Chromium) under the hood to load pages. On the f
 
 Your login session is saved to a file named `cookies_<domain>.json` in the folder where you run the script. On subsequent runs the script will reuse this session automatically and won't ask you to log in again unless the session has expired.
 
-> **Note:** The cookies file contains your session credentials. Keep it private and don't share it. The saved HTML files themselves contain no credentials, but keep in mind it will show the site's content from the perspective of your logged-in account.
+> **WARNING:** The cookies file contains your session credentials. Keep it private and don't share it. The saved HTML files themselves contain no credentials, but keep in mind it will show the site's content from the perspective of your logged-in account.
 
 ---
 
