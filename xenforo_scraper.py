@@ -198,40 +198,60 @@ def inject_xenforo_fixes(soup):
     fix_style.string = """
 /* === XENFORO OFFLINE LOOK RESTORED === */
 
-/* CHANGE 1: Dark gray fallback for any background that 403'd */
+/* Outermost — darkest */
 body, html {
-    background: #3a3a3a !important;
+    background: #2e2e2e !important;
     margin: 0;
     padding: 0;
 }
 
+/* Page wrapper — one step lighter */
 .p-pageWrapper {
     max-width: 1280px !important;
     margin: 20px auto !important;
-    background: #ffffff !important;
-    box-shadow: 0 0 15px rgba(0,0,0,0.12) !important;
+    background: #3a3a3a !important;
+    box-shadow: 0 0 15px rgba(0,0,0,0.25) !important;
     border-radius: 6px;
     overflow: hidden;
 }
-.p-body { background: transparent !important; padding: 20px 15px !important; }
+
+/* Body — another step lighter */
+.p-body {
+    background: #474747 !important;
+    padding: 20px 15px !important;
+}
 .p-body-inner, .pageContent { max-width: 100% !important; margin: 0 auto !important; }
 
-/* Post separation + styling */
+/* Post cards — lighter still */
 .message, .message--post, .block--messages .message {
-    background: #fff !important;
-    border: 1px solid #d8d8d8 !important;
+    background: #545454 !important;
+    border: 1px solid #404040 !important;
     border-radius: 4px !important;
     margin-bottom: 20px !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+    color: #e8e8e8 !important;
 }
 .message .message-inner { display: flex !important; }
-.message-cell--user { background: #f8f9fa !important; border-right: 1px solid #e5e5e5 !important; padding: 15px 12px !important; width: 140px !important; }
-.message-cell--main { padding: 15px !important; flex: 1 !important; }
+
+/* User sidebar — lightest gray layer */
+.message-cell--user {
+    background: #606060 !important;
+    border-right: 1px solid #404040 !important;
+    padding: 15px 12px !important;
+    width: 140px !important;
+}
+
+/* Main post content area */
+.message-cell--main {
+    padding: 15px !important;
+    flex: 1 !important;
+    background: #4e4e4e !important;
+}
 
 /* Attachment thumbnails */
 .attachment, .attachment-icon, .bbImageWrapper .thumbnail, .thumbnail {
-    border: 1px solid #ddd !important;
-    background: #fafafa !important;
+    border: 1px solid #404040 !important;
+    background: #5a5a5a !important;
     padding: 6px !important;
     margin: 8px 0 !important;
     max-width: 240px !important;
@@ -242,21 +262,61 @@ body, html {
     height: auto !important;
 }
 
-/* CHANGE 2: Fix inline image distortion — constrain width, never force height */
+/* Fix inline image distortion — constrain width, never force height */
 img.bbImage, .bbCodeImage, .message img:not(.avatar) {
     max-width: 100% !important;
     width: auto !important;
     height: auto !important;
-    border: 1px solid #eee !important;
+    border: 1px solid #404040 !important;
     display: block !important;
     margin: 4px 0 !important;
 }
 
+/* Expand all spoilers — JS toggle won't work from file:// */
+.bbCodeSpoiler-content {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
 /* General containers */
-.p-nav, .p-header { background: #2a2a2a !important; color: #fff !important; }
-.block, .block-container { border: 1px solid #e0e0e0 !important; }
+.p-nav, .p-header { background: #1e1e1e !important; color: #fff !important; }
+.block, .block-container { border: 1px solid #404040 !important; }
+
+/* Ensure text stays legible on dark backgrounds */
+.message-cell--main, .message-cell--user,
+.message-cell--main * { color: #e8e8e8 !important; }
+a { color: #7ab3e0 !important; }
+a:hover { color: #a8d0f0 !important; }
 """
     head.append(fix_style)
+
+    # Spoiler toggle — replaces XenForo's data-xf-click="toggle" which won't
+    # work from file:// URLs since it depends on XenForo's JS framework
+    spoiler_style = soup.new_tag('style', id='xenforo-spoiler-style')
+    spoiler_style.string = """
+.bbCodeSpoiler-content { display: none; }
+.bbCodeSpoiler-content.is-open { display: block; }
+.bbCodeSpoiler-button { cursor: pointer; }
+"""
+    head.append(spoiler_style)
+
+    spoiler_script = soup.new_tag('script', id='xenforo-spoiler-script')
+    spoiler_script.string = """
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.bbCodeSpoiler-button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var content = btn.closest('.bbCodeSpoiler').querySelector('.bbCodeSpoiler-content');
+            if (content) {
+                content.classList.toggle('is-open');
+            }
+        });
+    });
+});
+"""
+    head.append(spoiler_script)
 
 
 def make_soup(html):
@@ -314,12 +374,22 @@ def process_and_save_page(page_num, soup, out_dir, assets_dir, url_to_local, bas
             local = download_asset(full, session, assets_dir, url_to_local)
             a['href'] = local
 
-    # Media embed links (index.php?media/...) — rewrite href to local asset
+    # Media embed links (index.php?media/...) — rewrite href to use the
+    # full-size image src from the child <img> rather than the media viewer page
     for a in soup.find_all('a', href=True):
         if 'index.php?media/' in a['href']:
-            full = urljoin(base_url, a['href'])
-            local = download_asset(full, session, assets_dir, url_to_local)
-            a['href'] = local
+            img = a.find('img')
+            if img:
+                img_src = img.get('src', '')
+                if img_src:
+                    full = urljoin(base_url, img_src)
+                    local = download_asset(full, session, assets_dir, url_to_local)
+                    a['href'] = local
+            else:
+                # No child img — fall back to downloading the href directly
+                full = urljoin(base_url, a['href'])
+                local = download_asset(full, session, assets_dir, url_to_local)
+                a['href'] = local
 
     # Video/audio
     for tag in soup.find_all(['video', 'audio', 'source']):
