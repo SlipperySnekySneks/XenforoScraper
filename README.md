@@ -23,7 +23,7 @@ pip install requests beautifulsoup4 lxml tqdm playwright
 playwright install chromium
 ```
 
-Both scripts must be kept in the same directory.
+Both scripts (xenforo_scraper.py and convert_v2) must be kept in the same directory.
 
 ---
 
@@ -33,7 +33,7 @@ Both scripts must be kept in the same directory.
 python xenforo_scraper.py https://example.com/forum/threads/some-thread.12345/
 ```
 
-The first time you run this on a forum that requires login, a visible browser window will open. Log in, solve any CAPTCHA if prompted, then press **Enter** in the terminal. Your session cookies are saved automatically for future runs.
+The first time you run this on a forum that requires login, a visible browser window will open. Log in, solve any CAPTCHA if prompted, then press **Enter** in the terminal once the page is fully loaded. Your session cookies are saved automatically for future runs, so you will not have to do this again until the cookies expire.
 
 ---
 
