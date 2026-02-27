@@ -1,4 +1,4 @@
-# XenForo Thread Archiver — User Manual
+# XenForoScraper
 
 ## What is this?
 
